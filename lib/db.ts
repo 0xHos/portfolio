@@ -8,7 +8,8 @@ export function getDb() {
     return db;
   }
 
-  const dbPath = path.join(process.cwd(), 'portfolio.db');
+  const dbPath = path.join(process.cwd(), './temp/portfolio.db');
+  console.log('Initializing database at:', dbPath);
   db = new Database(dbPath);
 
   db.pragma('journal_mode = WAL');

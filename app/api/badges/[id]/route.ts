@@ -8,9 +8,12 @@ export async function GET(
   try {
     const id = (await params).id;
     const db = getDb();
-    const badge = db
-      .prepare('SELECT * FROM badges WHERE id = ?')
-      .get(id) as any;
+    const result = await db.execute({
+      sql: 'SELECT * FROM badges WHERE id = ?',
+      args: [id],
+    });
+
+    const badge = result.rows[0] as any;
 
     if (!badge) {
       return NextResponse.json(
@@ -45,13 +48,14 @@ export async function PUT(
     }
 
     const db = getDb();
-    db.prepare(
-      'UPDATE badges SET name = ?, color = ? WHERE id = ?'
-    ).run(name.trim(), color || '#2b8cee', id);
+    await db.execute({
+      sql: 'UPDATE badges SET name = ?, color = ? WHERE id = ?',
+      args: [name.trim(), color || '#2b8cee', id],
+    });
 
     return NextResponse.json({ id, name, color: color || '#2b8cee' });
   } catch (error: any) {
-    if (error.message.includes('UNIQUE constraint failed')) {
+    if (error.message?.includes('UNIQUE constraint failed') || error.message?.includes('constraint')) {
       return NextResponse.json(
         { error: 'الشارة موجودة بالفعل' },
         { status: 409 }
@@ -73,7 +77,10 @@ export async function DELETE(
     const id = (await params).id;
     const db = getDb();
     
-    db.prepare('DELETE FROM badges WHERE id = ?').run(id);
+    await db.execute({
+      sql: 'DELETE FROM badges WHERE id = ?',
+      args: [id],
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

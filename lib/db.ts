@@ -1,29 +1,34 @@
-import Database from 'better-sqlite3';
-import path from 'path';
+import { createClient, Client } from '@libsql/client';
+import * as bcryptjs from 'bcryptjs';
 
-let db: Database.Database | null = null;
+let client: Client | null = null;
 
 export function getDb() {
-  if (db) {
-    return db;
+  if (client) {
+    return client;
   }
 
-  const dbPath = path.join(process.cwd(), './temp/portfolio.db');
-  console.log('Initializing database at:', dbPath);
-  db = new Database(dbPath);
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
 
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+  if (!url || !authToken) {
+    throw new Error('TURSO_DATABASE_URL or TURSO_AUTH_TOKEN is not set');
+  }
+
+  client = createClient({
+    url,
+    authToken,
+  });
 
   // Initialize database schema
-  initializeDatabase(db);
+  initializeDatabase(client);
 
-  return db;
+  return client;
 }
 
-function initializeDatabase(database: Database.Database) {
+async function initializeDatabase(database: Client) {
   // Users table
-  database.exec(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
@@ -33,7 +38,7 @@ function initializeDatabase(database: Database.Database) {
   `);
 
   // Technologies table
-  database.exec(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS technologies (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
@@ -42,7 +47,7 @@ function initializeDatabase(database: Database.Database) {
   `);
 
   // Badges table
-  database.exec(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS badges (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
@@ -52,7 +57,7 @@ function initializeDatabase(database: Database.Database) {
   `);
 
   // Projects table
-  database.exec(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -65,7 +70,7 @@ function initializeDatabase(database: Database.Database) {
   `);
 
   // Project badges join table
-  database.exec(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS project_badges (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       project_id INTEGER NOT NULL,
@@ -77,7 +82,7 @@ function initializeDatabase(database: Database.Database) {
   `);
 
   // Contact messages table
-  database.exec(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS contact_messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -89,7 +94,7 @@ function initializeDatabase(database: Database.Database) {
   `);
 
   // Button settings table
-  database.exec(`
+  await database.execute(`
     CREATE TABLE IF NOT EXISTS button_settings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       key TEXT UNIQUE NOT NULL,
@@ -102,39 +107,43 @@ function initializeDatabase(database: Database.Database) {
   // Initialize default data
   try {
     // Check if default admin exists
-    const adminExists = database
-      .prepare('SELECT id FROM users WHERE username = ?')
-      .get('admin');
+    const adminResult = await database.execute({
+      sql: 'SELECT id FROM users WHERE username = ?',
+      args: ['admin'],
+    });
 
-    if (!adminExists) {
-      const bcrypt = require('bcryptjs');
-      const hashedPassword = bcrypt.hashSync('admin', 10);
-      database
-        .prepare('INSERT INTO users (username, password) VALUES (?, ?)')
-        .run('admin', hashedPassword);
+    if (!adminResult.rows || adminResult.rows.length === 0) {
+      const hashedPassword = bcryptjs.hashSync('admin', 10);
+      await database.execute({
+        sql: 'INSERT INTO users (username, password) VALUES (?, ?)',
+        args: ['admin', hashedPassword],
+      });
     }
 
     // Initialize default button settings
-    const buttonExists = database
-      .prepare('SELECT id FROM button_settings WHERE key = ?')
-      .get('consultation_button');
+    const buttonResult = await database.execute({
+      sql: 'SELECT id FROM button_settings WHERE key = ?',
+      args: ['consultation_button'],
+    });
 
-    if (!buttonExists) {
-      database
-        .prepare('INSERT INTO button_settings (key, label, url) VALUES (?, ?, ?)')
-        .run('consultation_button', 'احجز استشارة مجانية', '#contact');
+    if (!buttonResult.rows || buttonResult.rows.length === 0) {
+      await database.execute({
+        sql: 'INSERT INTO button_settings (key, label, url) VALUES (?, ?, ?)',
+        args: ['consultation_button', 'احجز استشارة مجانية', '#contact'],
+      });
     }
 
     // Initialize default technologies
-    const techCount = database
-      .prepare('SELECT COUNT(*) as count FROM technologies')
-      .get() as { count: number };
+    const techResult = await database.execute('SELECT COUNT(*) as count FROM technologies');
+    const count = (techResult.rows[0] as any)?.count || 0;
 
-    if (techCount.count === 0) {
+    if (count === 0) {
       const defaultTechs = ['React', 'Next.js', 'TypeScript', 'Node.js', 'PostgreSQL', 'TailwindCSS'];
-      const stmt = database.prepare('INSERT INTO technologies (name) VALUES (?)');
       for (const tech of defaultTechs) {
-        stmt.run(tech);
+        await database.execute({
+          sql: 'INSERT INTO technologies (name) VALUES (?)',
+          args: [tech],
+        });
       }
     }
   } catch (error) {

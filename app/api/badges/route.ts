@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET() {
   try {
     const db = getDb();
-    const badges = db.prepare('SELECT * FROM badges ORDER BY id').all() as any[];
+    const result = await db.execute('SELECT * FROM badges ORDER BY id');
+    const badges = result.rows as any[];
     return NextResponse.json(badges);
   } catch (error) {
     console.error('Error fetching badges:', error);
@@ -27,16 +28,17 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getDb();
-    const result = db.prepare(
-      'INSERT INTO badges (name, color) VALUES (?, ?)'
-    ).run(name.trim(), color || '#2b8cee');
+    const result = await db.execute({
+      sql: 'INSERT INTO badges (name, color) VALUES (?, ?)',
+      args: [name.trim(), color || '#2b8cee'],
+    });
 
     return NextResponse.json(
       { id: result.lastInsertRowid, name, color: color || '#2b8cee' },
       { status: 201 }
     );
   } catch (error: any) {
-    if (error.message.includes('UNIQUE constraint failed')) {
+    if (error.message?.includes('UNIQUE constraint failed') || error.message?.includes('constraint')) {
       return NextResponse.json(
         { error: 'الشارة موجودة بالفعل' },
         { status: 409 }

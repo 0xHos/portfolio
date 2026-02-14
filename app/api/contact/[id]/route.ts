@@ -8,9 +8,12 @@ export async function GET(
   try {
     const id = (await params).id;
     const db = getDb();
-    const message = db
-      .prepare('SELECT * FROM contact_messages WHERE id = ?')
-      .get(id) as any;
+    const result = await db.execute({
+      sql: 'SELECT * FROM contact_messages WHERE id = ?',
+      args: [id],
+    });
+
+    const message = result.rows[0] as any;
 
     if (!message) {
       return NextResponse.json(
@@ -37,7 +40,10 @@ export async function DELETE(
     const id = (await params).id;
     const db = getDb();
     
-    db.prepare('DELETE FROM contact_messages WHERE id = ?').run(id);
+    await db.execute({
+      sql: 'DELETE FROM contact_messages WHERE id = ?',
+      args: [id],
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

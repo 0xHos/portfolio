@@ -8,9 +8,12 @@ export async function GET(
   try {
     const id = (await params).id;
     const db = getDb();
-    const technology = db
-      .prepare('SELECT * FROM technologies WHERE id = ?')
-      .get(id) as any;
+    const result = await db.execute({
+      sql: 'SELECT * FROM technologies WHERE id = ?',
+      args: [id],
+    });
+
+    const technology = result.rows[0] as any;
 
     if (!technology) {
       return NextResponse.json(
@@ -45,13 +48,14 @@ export async function PUT(
     }
 
     const db = getDb();
-    db.prepare(
-      'UPDATE technologies SET name = ? WHERE id = ?'
-    ).run(name.trim(), id);
+    await db.execute({
+      sql: 'UPDATE technologies SET name = ? WHERE id = ?',
+      args: [name.trim(), id],
+    });
 
     return NextResponse.json({ id, name });
   } catch (error: any) {
-    if (error.message.includes('UNIQUE constraint failed')) {
+    if (error.message?.includes('UNIQUE constraint failed') || error.message?.includes('constraint')) {
       return NextResponse.json(
         { error: 'التقنية موجودة بالفعل' },
         { status: 409 }
@@ -73,7 +77,10 @@ export async function DELETE(
     const id = (await params).id;
     const db = getDb();
     
-    db.prepare('DELETE FROM technologies WHERE id = ?').run(id);
+    await db.execute({
+      sql: 'DELETE FROM technologies WHERE id = ?',
+      args: [id],
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

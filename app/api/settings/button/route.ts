@@ -1,8 +1,15 @@
 import { getDb } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+
 export async function GET() {
-     try {  const db = getDb();
-           const settings = db     .prepare('SELECT * FROM button_settings WHERE key = ?')     .get('consultation_button') as any;
+  try {
+    const db = getDb();
+    const result = await db.execute({
+      sql: 'SELECT * FROM button_settings WHERE key = ?',
+      args: ['consultation_button'],
+    });
+
+    const settings = result.rows[0] as any;
     return NextResponse.json(settings || { label: 'احجز استشارة مجانية', url: '#contact' });
   } catch (error) {
     console.error('Error fetching button settings:', error);
@@ -25,9 +32,10 @@ export async function PUT(req: NextRequest) {
     }
 
     const db = getDb();
-    db.prepare(
-      'UPDATE button_settings SET label = ?, url = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?'
-    ).run(label, url, 'consultation_button');
+    await db.execute({
+      sql: 'UPDATE button_settings SET label = ?, url = ?, updated_at = CURRENT_TIMESTAMP WHERE key = ?',
+      args: [label, url, 'consultation_button'],
+    });
 
     return NextResponse.json({ label, url });
   } catch (error) {

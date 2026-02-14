@@ -8,9 +8,12 @@ export async function GET(
   try {
     const id = (await params).id;
     const db = getDb();
-    const project = db
-      .prepare('SELECT * FROM projects WHERE id = ?')
-      .get(id) as any;
+    const projectResult = await db.execute({
+      sql: 'SELECT * FROM projects WHERE id = ?',
+      args: [id],
+    });
+
+    const project = projectResult.rows[0] as any;
 
     if (!project) {
       return NextResponse.json(
@@ -19,13 +22,14 @@ export async function GET(
       );
     }
 
-    const badges = db
-      .prepare(
-        `SELECT b.* FROM badges b 
-         JOIN project_badges pb ON b.id = pb.badge_id 
-         WHERE pb.project_id = ?`
-      )
-      .all(id) as any[];
+    const badgesResult = await db.execute({
+      sql: `SELECT b.* FROM badges b 
+            JOIN project_badges pb ON b.id = pb.badge_id 
+            WHERE pb.project_id = ?`,
+      args: [id],
+    });
+
+    const badges = badgesResult.rows as any[];
 
     return NextResponse.json({ ...project, badges });
   } catch (error) {
@@ -53,18 +57,23 @@ export async function PUT(
     }
 
     const db = getDb();
-    db.prepare(
-      'UPDATE projects SET name = ?, description = ?, image_url = ?, project_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
-    ).run(name, description, image_url || null, project_url || null, id);
+    await db.execute({
+      sql: 'UPDATE projects SET name = ?, description = ?, image_url = ?, project_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      args: [name, description, image_url || null, project_url || null, id],
+    });
 
     // Update badges
     if (badges && Array.isArray(badges)) {
-      db.prepare('DELETE FROM project_badges WHERE project_id = ?').run(id);
-      const stmt = db.prepare(
-        'INSERT INTO project_badges (project_id, badge_id) VALUES (?, ?)'
-      );
+      await db.execute({
+        sql: 'DELETE FROM project_badges WHERE project_id = ?',
+        args: [id],
+      });
+      
       for (const badgeId of badges) {
-        stmt.run(id, badgeId);
+        await db.execute({
+          sql: 'INSERT INTO project_badges (project_id, badge_id) VALUES (?, ?)',
+          args: [id, badgeId],
+        });
       }
     }
 
@@ -86,7 +95,10 @@ export async function DELETE(
     const id = (await params).id;
     const db = getDb();
     
-    db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+    await db.execute({
+      sql: 'DELETE FROM projects WHERE id = ?',
+      args: [id],
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

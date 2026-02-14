@@ -34,9 +34,12 @@ export async function PUT(req: NextRequest) {
     }
 
     const db = getDb();
-    const user = db
-      .prepare('SELECT * FROM users WHERE username = ?')
-      .get('admin') as any;
+    const result = await db.execute({
+      sql: 'SELECT * FROM users WHERE username = ?',
+      args: ['admin'],
+    });
+
+    const user = result.rows[0] as any;
 
     if (!user) {
       return NextResponse.json(
@@ -55,9 +58,10 @@ export async function PUT(req: NextRequest) {
     }
 
     const hashedNewPassword = bcrypt.hashSync(newPassword, 10);
-    db.prepare(
-      'UPDATE users SET password = ? WHERE id = ?'
-    ).run(hashedNewPassword, user.id);
+    await db.execute({
+      sql: 'UPDATE users SET password = ? WHERE id = ?',
+      args: [hashedNewPassword, user.id],
+    });
 
     return NextResponse.json({ success: true, message: 'تم تغيير كلمة المرور بنجاح' });
   } catch (error) {

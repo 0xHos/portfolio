@@ -10,30 +10,30 @@ export async function GET(req: NextRequest) {
 
     const db = getDb();
     
-    const projects = db
-      .prepare(
-        'SELECT * FROM projects ORDER BY created_at DESC LIMIT ? OFFSET ?'
-      )
-      .all(PROJECTS_PER_PAGE, offset) as any[];
+    const projectsResult = await db.execute({
+      sql: 'SELECT * FROM projects ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      args: [PROJECTS_PER_PAGE, offset],
+    });
+    
+    const projects = projectsResult.rows as any[];
 
-    const totalResult = db
-      .prepare('SELECT COUNT(*) as count FROM projects')
-      .get() as { count: number };
-
-    const total = totalResult.count;
+    const totalResult = await db.execute('SELECT COUNT(*) as count FROM projects');
+    const total = (totalResult.rows[0] as any)?.count || 0;
     const totalPages = Math.ceil(total / PROJECTS_PER_PAGE);
 
     // Fetch badges for each project
-    const projectsWithBadges = projects.map((project) => {
-      const badges = db
-        .prepare(
-          `SELECT b.* FROM badges b 
-           JOIN project_badges pb ON b.id = pb.badge_id 
-           WHERE pb.project_id = ?`
-        )
-        .all(project.id) as any[];
-      return { ...project, badges };
-    });
+    const projectsWithBadges = await Promise.all(
+      projects.map(async (project) => {
+        const badgesResult = await db.execute({
+          sql: `SELECT b.* FROM badges b 
+                JOIN project_badges pb ON b.id = pb.badge_id 
+                WHERE pb.project_id = ?`,
+          args: [project.id],
+        });
+        const badges = badgesResult.rows as any[];
+        return { ...project, badges };
+      })
+    );
 
     return NextResponse.json({
       data: projectsWithBadges,
@@ -65,19 +65,20 @@ export async function POST(req: NextRequest) {
     }
 
     const db = getDb();
-    const result = db.prepare(
-      'INSERT INTO projects (name, description, image_url, project_url) VALUES (?, ?, ?, ?)'
-    ).run(name, description, image_url || null, project_url || null);
+    const result = await db.execute({
+      sql: 'INSERT INTO projects (name, description, image_url, project_url) VALUES (?, ?, ?, ?)',
+      args: [name, description, image_url || null, project_url || null],
+    });
 
     const projectId = result.lastInsertRowid;
 
     // Add badges if provided
     if (badges && Array.isArray(badges)) {
-      const stmt = db.prepare(
-        'INSERT INTO project_badges (project_id, badge_id) VALUES (?, ?)'
-      );
       for (const badgeId of badges) {
-        stmt.run(projectId, badgeId);
+        await db.execute({
+          sql: 'INSERT INTO project_badges (project_id, badge_id) VALUES (?, ?)',
+          args: [projectId, badgeId],
+        });
       }
     }
 

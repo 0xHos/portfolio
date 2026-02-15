@@ -131,7 +131,7 @@ export default function Home() {
             </div>
           ) : (
            <div className="grid md:grid-cols-2 gap-8 mb-12">
-  {[...Array(4)].map((_, i) => (
+  {[...Array(2)].map((_, i) => (
     <div key={i} className="h-64 bg-slate-200 animate-pulse rounded-2xl" />
   ))}
 </div>

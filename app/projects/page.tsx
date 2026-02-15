@@ -96,9 +96,12 @@ export default function ProjectsPage() {
               )}
             </>
           ) : (
-            <div className="text-center py-12">
-              <p className="text-slate-500 text-xl">لا توجد مشاريع حالياً</p>
-            </div>
+            <div className="grid md:grid-cols-2 gap-8 mb-12">
+  {[...Array(4)].map((_, i) => (
+    <div key={i} className="h-64 bg-slate-200 animate-pulse rounded-2xl" />
+  ))}
+</div>
+
           )}
         </div>
       </section>

@@ -105,7 +105,7 @@ export default function ProjectsPage() {
 
       <footer className="py-12 border-t border-slate-100 text-center">
         <p className="text-slate-400 text-sm font-medium tracking-wide">
-          برمج بكل حب بواسطة <span className="text-slate-600 font-bold">Ahmed</span>
+          برمج بكل حب بواسطة <span className="text-slate-600 font-bold">Hossam</span>
         </p>
       </footer>
     </div>
